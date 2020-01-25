@@ -4,6 +4,8 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"simple_chat/src/domains/message_domain"
+	"simple_chat/src/hub/in_memory_hub"
 )
 
 var (
@@ -28,18 +30,25 @@ func (c *chatController) HandleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	in_memory_hub.Hub.AddClientCh <- conn
+
 	for {
 		messageType, p, err := conn.ReadMessage()
 		if err != nil {
+			err, ok := err.(*websocket.CloseError)
+			if ok {
+				in_memory_hub.Hub.RemoveClientCh <- conn
+				return
+			}
 			log.Printf("unble to read message. err: %s", err.Error())
-			return
 		}
+
+		msg := message_domain.Message{
+			Name: "",
+			Text: string(p),
+		}
+
+		in_memory_hub.Hub.BroadcastCh <- msg
 		log.Printf("received messae of type %d. msg: %s", messageType, string(p))
-		err = conn.WriteMessage(messageType, p)
-		if err != nil {
-			log.Printf("unble to write message. err: %s", err.Error())
-			return
-		}
-		log.Printf("message sent msg: %s", string(p))
 	}
 }
