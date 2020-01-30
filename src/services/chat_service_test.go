@@ -1,4 +1,4 @@
-package chat_service
+package services
 
 import (
 	"errors"
@@ -15,7 +15,7 @@ const (
 
 var (
 	client  *redis.Client
-	service = RedisChatService{}
+	service = redisChatService{}
 )
 
 func TestMain(m *testing.M) {
@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 func TestSendNewMessage(t *testing.T) {
 	defer client.FlushAll()
 
-	err := service.SendNewMessage(client, "42")
+	err := service.ArchiveMessage(client, "42")
 	assert.Nil(t, err)
 }
 
@@ -44,49 +44,56 @@ func TestAddUser(t *testing.T) {
 	assert.True(t, errors.Is(err, UserExistsError))
 }
 
-func TestProcessMessage(t *testing.T) {
-	defer client.FlushAll()
-
-	tstMsg := "42"
-	err := service.SendNewMessage(client, tstMsg)
-	assert.Nil(t, err)
-
-	msg, err := service.ProcessNewMessage(client, time.Second)
-	assert.Nil(t, err)
-	assert.Equal(t, msg, tstMsg)
-}
-
 func TestGetLastNMessages(t *testing.T) {
 	defer client.FlushAll()
 
-	service.SendNewMessage(client, "first")
-	service.SendNewMessage(client, "second")
-	service.SendNewMessage(client, "third")
-	service.SendNewMessage(client, "fourth")
-
-	service.ProcessNewMessage(client, time.Second)
-	service.ProcessNewMessage(client, time.Second)
-	service.ProcessNewMessage(client, time.Second)
+	service.ArchiveMessage(client, "first")
+	service.ArchiveMessage(client, "second")
+	service.ArchiveMessage(client, "third")
+	service.ArchiveMessage(client, "fourth")
 
 	msgs, err := service.GetLastNMessages(client, 4)
 	assert.Nil(t, err)
-	assert.Equal(t, len(msgs), 3)
+	assert.Equal(t, len(msgs), 4)
+	assert.Equal(t, "fourth", msgs[0])
 }
 
 func TestFromToMessages(t *testing.T) {
 	defer client.FlushAll()
 
-	service.SendNewMessage(client, "first")
-	service.SendNewMessage(client, "second")
-	service.SendNewMessage(client, "third")
-	service.SendNewMessage(client, "fourth")
-
-	service.ProcessNewMessage(client, time.Second)
-	service.ProcessNewMessage(client, time.Second)
-	service.ProcessNewMessage(client, time.Second)
+	service.ArchiveMessage(client, "first")
+	service.ArchiveMessage(client, "second")
+	service.ArchiveMessage(client, "third")
+	service.ArchiveMessage(client, "fourth")
 
 	msgs, err := service.GetFromToMessages(client, 1, 2)
 	assert.Nil(t, err)
-	assert.Equal(t, "second", msgs[0])
-	assert.Equal(t, "first", msgs[1])
+	assert.Equal(t, "third", msgs[0])
+	assert.Equal(t, "second", msgs[1])
+}
+
+func TestPublishMessage(t *testing.T) {
+	defer client.FlushAll()
+
+	err := service.PublishMessage(client, "ho-ho-ho motherfucker!")
+	assert.Nil(t, err)
+}
+
+func TestSubscribeToMessageChannel(t *testing.T) {
+	defer client.FlushAll()
+
+	msgCh := make(chan string, 10)
+	msg1 := "foo"
+	msg2 := "bar"
+	_ = msg2
+
+	go service.SubscribeToMessageChannel(client, msgCh)
+
+	time.Sleep(100 * time.Millisecond)
+
+	service.PublishMessage(client, msg1)
+	service.PublishMessage(client, msg2)
+
+	assert.Equal(t, msg1, <-msgCh)
+	assert.Equal(t, msg2, <-msgCh)
 }

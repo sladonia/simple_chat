@@ -20,8 +20,9 @@ func RunApp() {
 		panic(err)
 	}
 
-	http.HandleFunc("/", controllers.FileController.ServeHTML)
-	http.HandleFunc("/chat", controllers.ChatController.HandleChat)
+	http.HandleFunc("/", controllers.ChatController.HandleLogIn)
+	http.HandleFunc("/chat", controllers.FileController.ServeChatHTML)
+	http.HandleFunc("/chat-sock", controllers.ChatController.HandleChat)
 
 	log.Printf("start listening on port %s", port)
 	if err := http.ListenAndServe(port, nil); err != nil {

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Chat</title>
 </head>
 <body>
 <input id="input" type="text"/>
@@ -11,7 +11,8 @@
 <script>
     var input = document.getElementById("input");
     let output = document.getElementById("output");
-    let socket = new WebSocket("ws://localhost:8080/chat");
+    let socket = new WebSocket("ws://localhost:8080/chat-sock");
+    let name = get_query_param("name");
 
     socket.onopen = function () {
         output.innerHTML += "Status: Connected\n"
@@ -21,19 +22,24 @@
         output.innerHTML += e.data + "\n"
     };
 
-    function send() {
+    function send(name, value) {
         let message = {
-            "name": "Jhon",
-            "text": input.value
+            "name": name,
+            "text": value
         };
         socket.send(JSON.stringify(message));
         input.value = "";
     }
 
+    function get_query_param(parameter) {
+        let url = new URL(window.location.href);
+        return url.searchParams.get(parameter);
+    }
+
     input.addEventListener("keyup", function (event) {
         if (event.code == 'Enter') {
             event.preventDefault();
-            send();
+            send(name, input.value);
         }
     });
 

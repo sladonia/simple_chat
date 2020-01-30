@@ -3,11 +3,11 @@ package redisdb
 import "github.com/go-redis/redis/v7"
 
 var (
-	redisClient *redis.Client
+	RedisClient *redis.Client
 )
 
 func InitRedisClient(options *redis.Options) error {
-	redisClient = redis.NewClient(options)
-	_, err := redisClient.Ping().Result()
+	RedisClient = redis.NewClient(options)
+	_, err := RedisClient.Ping().Result()
 	return err
 }

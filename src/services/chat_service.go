@@ -1,36 +1,33 @@
-package chat_service
+package services
 
 import (
 	"errors"
 	"github.com/go-redis/redis/v7"
-	"time"
 )
 
 const (
-	oldMessagesList = "old_messages"
-	newMessageList  = "new_messages"
+	messagesList    = "messages_list"
+	messagesChannel = "messages_channel"
 	usersSet        = "users"
 )
 
-var TimeoutError = errors.New("timeout error")
-var UserExistsError = errors.New("username occupied")
+var (
+	UserExistsError                           = errors.New("username occupied")
+	ChatService     RedisChatServiceInterface = &redisChatService{}
+)
 
 type RedisChatServiceInterface interface {
-	SendNewMessage(client *redis.Client, msg string) error
 	AddUser(client *redis.Client, username string) error
-	ProcessNewMessage(client *redis.Client, timeout time.Duration) (string, error)
+	ArchiveMessage(client *redis.Client, msg string) error
 	GetLastNMessages(client *redis.Client, n int64) ([]string, error)
 	GetFromToMessages(client *redis.Client, from, to int64) ([]string, error)
+	PublishMessage(client *redis.Client, msg string) error
+	SubscribeToMessageChannel(client *redis.Client, msgCh chan<- string)
 }
 
-type RedisChatService struct{}
+type redisChatService struct{}
 
-func (s *RedisChatService) SendNewMessage(client *redis.Client, msg string) error {
-	_, err := client.LPush(newMessageList, msg).Result()
-	return err
-}
-
-func (s *RedisChatService) AddUser(client *redis.Client, username string) error {
+func (s *redisChatService) AddUser(client *redis.Client, username string) error {
 	exists, err := client.SIsMember(usersSet, username).Result()
 	if err != nil {
 		return err
@@ -41,18 +38,29 @@ func (s *RedisChatService) AddUser(client *redis.Client, username string) error 
 	return err
 }
 
-func (s *RedisChatService) ProcessNewMessage(client *redis.Client, timeout time.Duration) (string, error) {
-	res, err := client.BRPopLPush(newMessageList, oldMessagesList, timeout).Result()
-	if errors.Is(err, redis.Nil) {
-		return "", TimeoutError
+func (s *redisChatService) ArchiveMessage(client *redis.Client, msg string) error {
+	_, err := client.LPush(messagesList, msg).Result()
+	return err
+}
+
+func (s *redisChatService) GetLastNMessages(client *redis.Client, n int64) ([]string, error) {
+	return client.LRange(messagesList, 0, n).Result()
+}
+
+func (s *redisChatService) GetFromToMessages(client *redis.Client, from, to int64) ([]string, error) {
+	return client.LRange(messagesList, from, to).Result()
+}
+
+func (s *redisChatService) PublishMessage(client *redis.Client, msg string) error {
+	_, err := client.Publish(messagesChannel, msg).Result()
+	return err
+}
+
+func (s *redisChatService) SubscribeToMessageChannel(client *redis.Client, msgCh chan<- string) {
+	pubSub := client.Subscribe(messagesChannel)
+
+	for {
+		msg, _ := pubSub.ReceiveMessage()
+		msgCh <- msg.Payload
 	}
-	return res, err
-}
-
-func (s *RedisChatService) GetLastNMessages(client *redis.Client, n int64) ([]string, error) {
-	return client.LRange(oldMessagesList, 0, n).Result()
-}
-
-func (s *RedisChatService) GetFromToMessages(client *redis.Client, from, to int64) ([]string, error) {
-	return client.LRange(oldMessagesList, from, to).Result()
 }
