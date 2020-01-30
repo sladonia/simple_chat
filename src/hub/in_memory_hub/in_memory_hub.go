@@ -46,7 +46,7 @@ func (h InMemoryHub) RemoveClient(conn *websocket.Conn) {
 func (h *InMemoryHub) Broadcast(msg message_domain.Message) {
 	log.Printf("start message broadcasting: %s", msg.Text)
 	for _, conn := range h.Clients {
-		err := conn.WriteJSON(msg)
+		err := conn.WriteMessage(1, msg.Serialize())
 		if err != nil {
 			log.Printf("unble to write msg. err: %s", err.Error())
 		}

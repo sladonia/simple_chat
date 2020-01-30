@@ -8,3 +8,7 @@ type Message struct {
 func (m Message) String() string {
 	return m.Name + ": " + m.Text
 }
+
+func (m Message) Serialize() []byte {
+	return []byte(m.String())
+}
