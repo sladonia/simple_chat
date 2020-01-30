@@ -8,4 +8,11 @@ build:
 fmt:
 	go fmt ./src/...
 
-.PHONY: run build fmt
+test:
+	@ go test ./src/...
+
+dep:
+	@ cd ./src
+	go mod tidy
+
+.PHONY: run build fmt dep

@@ -1,0 +1,17 @@
+version: "3.7"
+
+services:
+  redis:
+    image: redis:5-alpine
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data:rw
+  redis-tst:
+    image: redis:5-alpine
+    ports:
+      - 6378:6378
+
+volumes:
+  redis_data:
+    driver: local

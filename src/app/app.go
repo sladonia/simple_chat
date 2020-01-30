@@ -1,9 +1,11 @@
 package app
 
 import (
+	"github.com/go-redis/redis/v7"
 	"log"
 	"net/http"
 	"simple_chat/src/controllers"
+	"simple_chat/src/datasources/redisdb"
 )
 
 const (
@@ -11,6 +13,13 @@ const (
 )
 
 func RunApp() {
+	opt := &redis.Options{
+		Addr: "localhost:6379",
+	}
+	if err := redisdb.InitRedisClient(opt); err != nil {
+		panic(err)
+	}
+
 	http.HandleFunc("/", controllers.FileController.ServeHTML)
 	http.HandleFunc("/chat", controllers.ChatController.HandleChat)
 
