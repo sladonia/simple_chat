@@ -33,7 +33,8 @@ func (c *chatController) HandleChat(w http.ResponseWriter, r *http.Request) {
 	in_memory_hub.Hub.AddClientCh <- conn
 
 	for {
-		messageType, p, err := conn.ReadMessage()
+		msg := message_domain.Message{}
+		err = conn.ReadJSON(&msg)
 		if err != nil {
 			err, ok := err.(*websocket.CloseError)
 			if ok {
@@ -43,12 +44,7 @@ func (c *chatController) HandleChat(w http.ResponseWriter, r *http.Request) {
 			log.Printf("unble to read message. err: %s", err.Error())
 		}
 
-		msg := message_domain.Message{
-			Name: "",
-			Text: string(p),
-		}
-
 		in_memory_hub.Hub.BroadcastCh <- msg
-		log.Printf("received messae of type %d. msg: %s", messageType, string(p))
+		log.Printf("received messae: %s", msg.String())
 	}
 }

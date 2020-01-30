@@ -18,11 +18,15 @@
     };
 
     socket.onmessage = function (e) {
-        output.innerHTML += "Server Echos: " + e.data + "\n"
+        output.innerHTML += e.data + "\n"
     };
 
     function send() {
-        socket.send(input.value);
+        let message = {
+            "name": "Jhon",
+            "text": input.value
+        };
+        socket.send(JSON.stringify(message));
         input.value = "";
     }
 
