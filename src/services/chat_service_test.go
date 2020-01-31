@@ -44,6 +44,33 @@ func TestAddUser(t *testing.T) {
 	assert.True(t, errors.Is(err, UserExistsError))
 }
 
+func TestRemoveUser(t *testing.T) {
+	defer client.FlushAll()
+
+	username := "Richard"
+	err := service.AddUser(client, username)
+	assert.Nil(t, err)
+
+	err = service.RemoveUser(client, username)
+	assert.Nil(t, err)
+	err = service.RemoveUser(client, username)
+	assert.NotNil(t, err)
+	assert.True(t, errors.Is(UserNotExistError, err))
+}
+
+func TestUsernameIsFree(t *testing.T) {
+	defer client.FlushAll()
+
+	username := "Richard"
+	free, err := service.UsernameIsFree(client, username)
+	assert.Nil(t, err)
+	assert.True(t, free)
+	service.AddUser(client, username)
+	free, err = service.UsernameIsFree(client, username)
+	assert.Nil(t, err)
+	assert.False(t, free)
+}
+
 func TestGetLastNMessages(t *testing.T) {
 	defer client.FlushAll()
 

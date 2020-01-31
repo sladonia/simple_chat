@@ -12,8 +12,9 @@ const (
 )
 
 var (
-	UserExistsError                           = errors.New("username occupied")
-	ChatService     RedisChatServiceInterface = &redisChatService{}
+	UserExistsError                             = errors.New("username occupied")
+	UserNotExistError                           = errors.New("user does not exist")
+	ChatService       RedisChatServiceInterface = &redisChatService{}
 )
 
 type RedisChatServiceInterface interface {
@@ -23,6 +24,8 @@ type RedisChatServiceInterface interface {
 	GetFromToMessages(client *redis.Client, from, to int64) ([]string, error)
 	PublishMessage(client *redis.Client, msg string) error
 	SubscribeToMessageChannel(client *redis.Client, msgCh chan<- string)
+	RemoveUser(client *redis.Client, username string) error
+	UsernameIsFree(client *redis.Client, username string) (bool, error)
 }
 
 type redisChatService struct{}
@@ -36,6 +39,21 @@ func (s *redisChatService) AddUser(client *redis.Client, username string) error 
 	}
 	_, err = client.SAdd(usersSet, username).Result()
 	return err
+}
+
+func (s *redisChatService) RemoveUser(client *redis.Client, username string) error {
+	numRemoved, err := client.SRem(usersSet, username).Result()
+	if err != nil {
+		return err
+	} else if numRemoved != 1 {
+		return UserNotExistError
+	}
+	return nil
+}
+
+func (s *redisChatService) UsernameIsFree(client *redis.Client, username string) (bool, error) {
+	exist, err := client.SIsMember(usersSet, username).Result()
+	return !exist, err
 }
 
 func (s *redisChatService) ArchiveMessage(client *redis.Client, msg string) error {

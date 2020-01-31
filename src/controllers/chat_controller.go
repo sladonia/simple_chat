@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"simple_chat/src/datasources/redisdb"
 	"simple_chat/src/domains/message_domain"
-	"simple_chat/src/hub/in_memory_hub"
+	"simple_chat/src/hub/hub"
 	"simple_chat/src/services"
 	"strings"
 )
@@ -31,14 +31,35 @@ type ChatControllerInterface interface {
 type chatController struct{}
 
 func (c *chatController) HandleChat(w http.ResponseWriter, r *http.Request) {
+	queryParams := r.URL.Query()
+	log.Println(queryParams)
+	values, ok := queryParams["name"]
+	if !ok || len(values) < 1 {
+		log.Print("no name for chat provided")
+		http.Error(w, "chat name should be provided", http.StatusBadRequest)
+		return
+	}
+	name := values[0]
+
+	isFree, err := services.ChatService.UsernameIsFree(redisdb.RedisClient, name)
+	if !isFree || err != nil {
+		log.Printf("name %s is occupied", name)
+		http.Error(w, "name is occupied", http.StatusBadRequest)
+		return
+	}
+
 	log.Printf("creating websocket connection with %s", r.Host)
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("unable to upgrade connecion. err: %s", err.Error())
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	in_memory_hub.Hub.AddClientCh <- conn
+	hub.Hub.AddClientCh <- hub.UserConnection{
+		Name: name,
+		Conn: conn,
+	}
 
 	for {
 		msg := message_domain.Message{}
@@ -46,14 +67,17 @@ func (c *chatController) HandleChat(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			err, ok := err.(*websocket.CloseError)
 			if ok {
-				in_memory_hub.Hub.RemoveClientCh <- conn
+				hub.Hub.RemoveClientCh <- name
 				return
 			}
 			log.Printf("unble to read message. err: %s", err.Error())
 		}
-
-		in_memory_hub.Hub.BroadcastCh <- msg
 		log.Printf("received messae: %s", msg.String())
+
+		err := services.ChatService.PublishMessage(redisdb.RedisClient, msg.String())
+		if err != nil {
+			log.Printf("error publishinbg message: %s", err)
+		}
 	}
 }
 
@@ -92,14 +116,13 @@ func (c *chatController) HandleLogIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = services.ChatService.AddUser(redisdb.RedisClient, name)
+	isFree, err := services.ChatService.UsernameIsFree(redisdb.RedisClient, name)
+	if !isFree {
+		_ = tmpl.Execute(w, msg{Err: "name already occupied"})
+		return
+	}
 	if err != nil {
-		if errors.Is(err, services.UserExistsError) {
-			_ = tmpl.Execute(w, msg{Err: "name already occupied"})
-		} else {
-			http.Error(w, "internal server error", http.StatusInternalServerError)
-			return
-		}
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	url := fmt.Sprintf("/chat?name=%s", name)
