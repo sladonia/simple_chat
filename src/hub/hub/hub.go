@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"fmt"
 	"github.com/gorilla/websocket"
 	"log"
 	"simple_chat/src/datasources/redisdb"
@@ -40,12 +41,16 @@ func (h *InMemoryHub) AddClient(uc UserConnection) {
 		return
 	}
 	h.Clients[uc.Name] = uc.Conn
+	services.ChatService.PublishMessage(redisdb.RedisClient,
+		fmt.Sprintf("%s joined the chat", uc.Name))
 }
 
 func (h InMemoryHub) RemoveClient(clientName string) {
 	log.Printf("removeing client name: %s", clientName)
 	delete(h.Clients, clientName)
 	_ = services.ChatService.RemoveUser(redisdb.RedisClient, clientName)
+	services.ChatService.PublishMessage(redisdb.RedisClient,
+		fmt.Sprintf("%s left the chat", clientName))
 }
 
 func (h *InMemoryHub) Broadcast(msg string) {
@@ -68,6 +73,7 @@ func (h *InMemoryHub) Run() {
 			h.RemoveClient(clientName)
 		case msg := <-h.BroadcastCh:
 			h.Broadcast(msg)
+			services.ChatService.ArchiveMessage(redisdb.RedisClient, msg)
 		}
 	}
 }
