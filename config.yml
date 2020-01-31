@@ -1,0 +1,7 @@
+servicename: simple_chat
+address: localhost:8080
+env: dev
+loglevel: debug
+redisconfig:
+  address: localhost:6379
+  poolsize: 10

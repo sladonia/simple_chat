@@ -3,17 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <title>Chat</title>
+    <style>
+        #chatconteiner {
+            margin: auto;
+            margin-top: 100px;
+            width: 600px;
+            padding: 10px;
+        }
+
+        textarea {
+            width: 100%;
+        }
+
+        button {
+            width: 100%;
+        }
+
+        pre {
+            border: 1px solid grey;
+            height: 400px;
+            overflow: scroll;
+        }
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/pure-min.css"
+          integrity="sha384-oAOxQR6DkCoMliIh8yFnu25d7Eq/PHS21PClpwjOTeU2jRSq11vu66rf90/cZr47" crossorigin="anonymous">
 </head>
 <body>
-<input id="input" type="text"/>
-<button onclick="send()">Send</button>
-<pre id="output"></pre>
+<div id="chatconteiner">
+    <pre id="output"></pre>
+    <textarea id="input" type="text" rows="4"></textarea><br/>
+    <button onclick="send_button()" class="pure-button pure-button-primary">Send</button>
+</div>
 <script>
     var input = document.getElementById("input");
     let output = document.getElementById("output");
     let name = get_query_param("name");
+    let message_count = 0;
 
-    address = "ws://localhost:8080/chat-sock";
+    // address = "ws://localhost:8080/chat-sock";
+    address = "ws://{{ .Address }}/chat-sock";
+
+    console.log(address);
+
     if (name !== null) {
         address = address + "?name=" + name;
     }
@@ -21,11 +52,17 @@
     let socket = new WebSocket(address);
 
     socket.onopen = function () {
-        output.innerHTML += "Status: Connected\n"
+        get_old_messages(1, 100);
+        scroll_chat_down();
+    };
+
+    socket.onclose = function () {
+        window.alert("connection lost. Try to log in again");
     };
 
     socket.onmessage = function (e) {
-        output.innerHTML += e.data + "\n"
+        put_message(e.data);
+        scroll_chat_down();
     };
 
     function send(name, value) {
@@ -42,10 +79,49 @@
         return url.searchParams.get(parameter);
     }
 
+    function send_button() {
+        send(name, input.value)
+    }
+
+    function put_message(msg) {
+        message_count++;
+        output.innerHTML += msg + "\n";
+    }
+
+    function put_in_the_end(msgs) {
+        let buffer = "";
+        for (const msg of msgs.reverse()) {
+            buffer += msg + "\n";
+        }
+        output.innerHTML = buffer + output.innerHTML
+    }
+
+    function scroll_chat_down() {
+        output.scrollTop = output.scrollHeight;
+    }
+
+    function get_old_messages(start, end) {
+        let xhttp = new XMLHttpRequest();
+        xhttp.open("POST", "/chat/get-messages", true);
+        xhttp.onreadystatechange = function () {
+            if (xhttp.readyState === 4 && xhttp.status === 200) {
+                messages = JSON.parse(xhttp.responseText);
+                put_in_the_end(messages);
+            }
+        };
+
+        xhttp.send(JSON.stringify(
+            {
+                "from": start,
+                "to": end,
+            }
+        ))
+    }
+
     input.addEventListener("keyup", function (event) {
         if (event.code == 'Enter') {
             event.preventDefault();
-            send(name, input.value);
+            send(name, input.value.replace('\n', ''));
         }
     });
 

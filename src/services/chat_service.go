@@ -8,7 +8,7 @@ import (
 const (
 	messagesList    = "messages_list"
 	messagesChannel = "messages_channel"
-	usersSet        = "users"
+	UsersSet        = "users"
 )
 
 var (
@@ -31,18 +31,18 @@ type RedisChatServiceInterface interface {
 type redisChatService struct{}
 
 func (s *redisChatService) AddUser(client *redis.Client, username string) error {
-	exists, err := client.SIsMember(usersSet, username).Result()
+	exists, err := client.SIsMember(UsersSet, username).Result()
 	if err != nil {
 		return err
 	} else if exists {
 		return UserExistsError
 	}
-	_, err = client.SAdd(usersSet, username).Result()
+	_, err = client.SAdd(UsersSet, username).Result()
 	return err
 }
 
 func (s *redisChatService) RemoveUser(client *redis.Client, username string) error {
-	numRemoved, err := client.SRem(usersSet, username).Result()
+	numRemoved, err := client.SRem(UsersSet, username).Result()
 	if err != nil {
 		return err
 	} else if numRemoved != 1 {
@@ -52,7 +52,7 @@ func (s *redisChatService) RemoveUser(client *redis.Client, username string) err
 }
 
 func (s *redisChatService) UsernameIsFree(client *redis.Client, username string) (bool, error) {
-	exist, err := client.SIsMember(usersSet, username).Result()
+	exist, err := client.SIsMember(UsersSet, username).Result()
 	return !exist, err
 }
 

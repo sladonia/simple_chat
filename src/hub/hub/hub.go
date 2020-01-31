@@ -9,23 +9,18 @@ import (
 )
 
 var (
-	Hub = NewInMemoryHub()
+	Hub = NewChatHub()
 )
 
-func init() {
-	log.Printf("starting hub")
-	go Hub.Run()
-}
-
-type InMemoryHub struct {
+type ChatHub struct {
 	Clients        map[string]*websocket.Conn
 	AddClientCh    chan UserConnection
 	RemoveClientCh chan string
 	BroadcastCh    chan string
 }
 
-func NewInMemoryHub() *InMemoryHub {
-	return &InMemoryHub{
+func NewChatHub() *ChatHub {
+	return &ChatHub{
 		Clients:        make(map[string]*websocket.Conn),
 		AddClientCh:    make(chan UserConnection),
 		RemoveClientCh: make(chan string),
@@ -33,7 +28,7 @@ func NewInMemoryHub() *InMemoryHub {
 	}
 }
 
-func (h *InMemoryHub) AddClient(uc UserConnection) {
+func (h *ChatHub) AddClient(uc UserConnection) {
 	log.Printf("adding client name: %s", uc.Name)
 	err := services.ChatService.AddUser(redisdb.RedisClient, uc.Name)
 	if err != nil {
@@ -45,7 +40,7 @@ func (h *InMemoryHub) AddClient(uc UserConnection) {
 		fmt.Sprintf("%s joined the chat", uc.Name))
 }
 
-func (h InMemoryHub) RemoveClient(clientName string) {
+func (h ChatHub) RemoveClient(clientName string) {
 	log.Printf("removeing client name: %s", clientName)
 	delete(h.Clients, clientName)
 	_ = services.ChatService.RemoveUser(redisdb.RedisClient, clientName)
@@ -53,7 +48,7 @@ func (h InMemoryHub) RemoveClient(clientName string) {
 		fmt.Sprintf("%s left the chat", clientName))
 }
 
-func (h *InMemoryHub) Broadcast(msg string) {
+func (h *ChatHub) Broadcast(msg string) {
 	log.Printf("start message broadcasting: %s", msg)
 	for _, conn := range h.Clients {
 		err := conn.WriteMessage(1, []byte(msg))
@@ -63,7 +58,7 @@ func (h *InMemoryHub) Broadcast(msg string) {
 	}
 }
 
-func (h *InMemoryHub) Run() {
+func (h *ChatHub) Run() {
 	go services.ChatService.SubscribeToMessageChannel(redisdb.RedisClient, h.BroadcastCh)
 	for {
 		select {
