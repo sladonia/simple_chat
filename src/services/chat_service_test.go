@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/assert"
 	"os"
@@ -23,6 +24,11 @@ func TestMain(m *testing.M) {
 		Addr: address,
 	}
 	client = redis.NewClient(options)
+	_, err := client.Ping().Result()
+	if err != nil {
+		fmt.Println("unable connect to redis")
+		os.Exit(1)
+	}
 	os.Exit(m.Run())
 }
 
