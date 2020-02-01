@@ -26,6 +26,7 @@ type RedisChatServiceInterface interface {
 	SubscribeToMessageChannel(client *redis.Client, msgCh chan<- string)
 	RemoveUser(client *redis.Client, username string) error
 	UsernameIsFree(client *redis.Client, username string) (bool, error)
+	RemoveUsers(client *redis.Client, users ...string) error
 }
 
 type redisChatService struct{}
@@ -81,4 +82,12 @@ func (s *redisChatService) SubscribeToMessageChannel(client *redis.Client, msgCh
 		msg, _ := pubSub.ReceiveMessage()
 		msgCh <- msg.Payload
 	}
+}
+
+func (s *redisChatService) RemoveUsers(client *redis.Client, users ...string) error {
+	if len(users) == 0 {
+		return nil
+	}
+	_, err := client.SRem(UsersSet, users).Result()
+	return err
 }

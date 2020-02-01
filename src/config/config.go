@@ -7,6 +7,7 @@ const configPath = "config.yml"
 var Config Configuration
 
 type Configuration struct {
+	ServiceName string `env:"SERVICE_NAME"`
 	Address     string `env:"SERVICE_ADDRESS"`
 	LogLevel    string `env:"LOG_LEVEL"`
 	RedisConfig RedisConfig

@@ -3,8 +3,8 @@ package hub
 import (
 	"fmt"
 	"github.com/gorilla/websocket"
-	"log"
 	"simple_chat/src/datasources/redisdb"
+	"simple_chat/src/logger"
 	"simple_chat/src/services"
 )
 
@@ -29,32 +29,49 @@ func NewChatHub() *ChatHub {
 }
 
 func (h *ChatHub) AddClient(uc UserConnection) {
-	log.Printf("adding client name: %s", uc.Name)
+	logger.Logger.Debugf("adding client name: %s", uc.Name)
 	err := services.ChatService.AddUser(redisdb.RedisClient, uc.Name)
 	if err != nil {
-		log.Printf("anable to add client: %s", uc.Name)
+		logger.Logger.Errorw("unable to add client", "client_name", uc.Name, "err", err)
 		return
 	}
 	h.Clients[uc.Name] = uc.Conn
-	services.ChatService.PublishMessage(redisdb.RedisClient,
+	err = services.ChatService.PublishMessage(redisdb.RedisClient,
 		fmt.Sprintf("%s joined the chat", uc.Name))
+	if err != nil {
+		logger.Logger.Errorw("unable to publish message", "err", err)
+	}
 }
 
 func (h ChatHub) RemoveClient(clientName string) {
-	log.Printf("removeing client name: %s", clientName)
+	logger.Logger.Infof("removing client name: %s", clientName)
 	delete(h.Clients, clientName)
 	_ = services.ChatService.RemoveUser(redisdb.RedisClient, clientName)
-	services.ChatService.PublishMessage(redisdb.RedisClient,
+	err := services.ChatService.PublishMessage(redisdb.RedisClient,
 		fmt.Sprintf("%s left the chat", clientName))
+	if err != nil {
+		logger.Logger.Errorw("unable to publish message", "err", err)
+	}
 }
 
 func (h *ChatHub) Broadcast(msg string) {
-	log.Printf("start message broadcasting: %s", msg)
+	logger.Logger.Debugf("start message broadcasting: %s", msg)
 	for _, conn := range h.Clients {
 		err := conn.WriteMessage(1, []byte(msg))
 		if err != nil {
-			log.Printf("unble to write msg. err: %s", err.Error())
+			logger.Logger.Errorw("unable to write msg", "err", err.Error())
 		}
+	}
+}
+
+func (h *ChatHub) ShutDown() {
+	users := make([]string, 0, 10)
+	for user := range h.Clients {
+		users = append(users, user)
+	}
+	err := services.ChatService.RemoveUsers(redisdb.RedisClient, users...)
+	if err != nil {
+		logger.Logger.Errorw("error removing users from redis", "err", err)
 	}
 }
 
@@ -68,7 +85,10 @@ func (h *ChatHub) Run() {
 			h.RemoveClient(clientName)
 		case msg := <-h.BroadcastCh:
 			h.Broadcast(msg)
-			services.ChatService.ArchiveMessage(redisdb.RedisClient, msg)
+			err := services.ChatService.ArchiveMessage(redisdb.RedisClient, msg)
+			if err != nil {
+				logger.Logger.Errorw("unable to archive the message", "err", err)
+			}
 		}
 	}
 }

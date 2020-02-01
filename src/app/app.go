@@ -2,7 +2,6 @@ package app
 
 import (
 	"github.com/go-redis/redis/v7"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,7 +9,7 @@ import (
 	"simple_chat/src/controllers"
 	"simple_chat/src/datasources/redisdb"
 	"simple_chat/src/hub/hub"
-	"simple_chat/src/services"
+	"simple_chat/src/logger"
 	"syscall"
 )
 
@@ -22,6 +21,12 @@ func RunApp() {
 	if err := config.Load(); err != nil {
 		panic(err)
 	}
+
+	if err := logger.InitLogger(config.Config.ServiceName, config.Config.LogLevel); err != nil {
+		panic(err)
+	}
+
+	logger.Logger.Debug("logger initialized")
 
 	opt := &redis.Options{
 		Addr:     config.Config.RedisConfig.Address,
@@ -39,7 +44,7 @@ func RunApp() {
 	http.HandleFunc("/chat/get-messages", controllers.ChatController.GetMessages)
 	http.HandleFunc("/chat-sock", controllers.ChatController.HandleChat)
 
-	log.Printf("start listening on port %s", port)
+	logger.Logger.Infof("start listening on port %s", port)
 
 	go hub.Hub.Run()
 
@@ -50,6 +55,7 @@ func RunApp() {
 	}()
 
 	<-done
-	redisdb.RedisClient.Del(services.UsersSet)
-	log.Printf("Shutting down gracefully...")
+	hub.Hub.ShutDown()
+	logger.Logger.Info("shutting down gracefully")
+	logger.Logger.Sync()
 }

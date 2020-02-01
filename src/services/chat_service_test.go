@@ -124,3 +124,23 @@ func TestSubscribeToMessageChannel(t *testing.T) {
 	assert.Equal(t, msg1, <-msgCh)
 	assert.Equal(t, msg2, <-msgCh)
 }
+
+func TestRemoveUsers(t *testing.T) {
+	defer client.FlushAll()
+
+	users := []string{"Mat", "Richard", "McCunaughey"}
+
+	for _, user := range users {
+		err := service.AddUser(client, user)
+		assert.Nil(t, err)
+	}
+	numUsers, _ := client.SCard(UsersSet).Result()
+	assert.Equal(t, int64(3), numUsers)
+	err := service.RemoveUsers(client, users...)
+	assert.Nil(t, err)
+	numUsers, _ = client.SCard(UsersSet).Result()
+	assert.Equal(t, int64(0), numUsers)
+
+	err = service.RemoveUsers(client, users...)
+	assert.Nil(t, err)
+}
